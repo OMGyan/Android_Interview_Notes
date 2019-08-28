@@ -1,0 +1,212 @@
+Q:请列举Context的常见使用场景
+
+A:
+1.启动activity(startActivity)
+2.启动Service(startService)
+3.发送广播(sendBroadcast),注册广播接受者(registerReceiver)
+4.获取ContentResolver(getContentResolver)
+5.打开或创建数据库(openOrCreateDatabase)
+6.弹出对话框Dialog
+7.获取资源(getResources)
+8.获取类加载器(getClassLoader)
+...
+
+--------------------------------------------------------------------------------------------------------------------
+Context的继承结构:
+首先它有两个直接子类包括ContextWrapper(上下文功能的封装类)，ContextImpl(上下文功能的实现类)
+ContextWrapper又有三个直接子类包括application，service，ContextThemeWrapper(带主题的封装类)
+最后ContextThemeWrapper又有一个直接子类activity
+
+由此，其实我们就已经可以得出结论了，Context一共有三种类型，分别是Application、Activity和Service。
+这三个类虽然分别各种承担着不同的作用，但它们都属于Context的一种，而它们具体Context的功能则是由ContextImpl类去实现的。
+
+由于Context的具体能力是由ContextImpl类去实现的，因此在绝大多数场景下，Activity、Service和Application这三种类型的Context都是可以通用的。
+不过有几种场景比较特殊，比如启动Activity，还有弹出Dialog。出于安全原因的考虑，Android是不允许Activity或Dialog凭空出现的，
+一个Activity的启动必须要建立在另一个Activity的基础之上，也就是以此形成的返回栈。而Dialog则必须在一个Activity上面弹出（除非是System Alert类型的Dialog），
+因此在这种场景下，我们只能使用Activity类型的Context，否则将会出错。
+
+
+Context的数量:
+context数量 = activity数+service数+1(一个应用中只有一个application)
+
+----------------------------------------------------------------------------------------------------------------------------
+getApplication与getApplicationContext的异同:
+绝大多数情况下, getApplication()和getApplicationContext()这两个方法完全一致, 返回值也相同; 那么两者到底有什么区别呢? 
+真正理解这个问题的人非常少. 接下来彻底地回答下这个问题:
+
+getApplicationContext()这个的存在是Android历史原因. 我们都知道getApplication()只存在于Activity和Service对象; 
+那么对于BroadcastReceiver和ContentProvider却无法获取Application, 这时就需要一个能在Context上下文直接使用的方法, 那便是getApplicationContext().
+
+两者对比:
+
+对于Activity/Service来说, getApplication()和getApplicationContext()的返回值完全相同; 除非厂商修改过接口;
+BroadcastReceiver在onReceive的过程, 能使用getBaseContext().getApplicationContext获取所在Application, 而无法使用getApplication;
+ContentProvider能使用getContext().getApplicationContext()获取所在Application. 绝大多数情况下没有问题, 但是有可能会出现空指针的问题, 情况如下:
+
+当同一个进程有多个apk的情况下, 对于第二个apk是由provider方式拉起的, 前面介绍过provider创建过程并不会初始化所在application, 
+此时执行 getContext().getApplicationContext()返回的结果便是NULL. 所以对于这种情况要做好判空.
+如果对于Application理解不够深刻, 建议getApplicationContext()方法谨慎使用, 做好是否为空的判定,防止出现空指针异常.
+----------------------------------------------------------------------------------------------------------------------------------
+提一下application的使用误区:
+因为Application、Activity、Service都是直接或间接继承自ContextWrapper的，我们就直接看ContextWrapper的源码，如下所示：
+
+/**
+ * Proxying implementation of Context that simply delegates all of its calls to
+ * another Context.  Can be subclassed to modify behavior without changing
+ * the original Context.
+ */
+public class ContextWrapper extends Context {
+    Context mBase;
+    
+    /**
+     * Set the base context for this ContextWrapper.  All calls will then be
+     * delegated to the base context.  Throws
+     * IllegalStateException if a base context has already been set.
+     * 
+     * @param base The new base context for this wrapper.
+     */
+    protected void attachBaseContext(Context base) {
+        if (mBase != null) {
+            throw new IllegalStateException("Base context already set");
+        }
+        mBase = base;
+    }
+ 
+    /**
+     * @return the base context as set by the constructor or setBaseContext
+     */
+    public Context getBaseContext() {
+        return mBase;
+    }
+ 
+    @Override
+    public AssetManager getAssets() {
+        return mBase.getAssets();
+    }
+ 
+    @Override
+    public Resources getResources() {
+        return mBase.getResources();
+    }
+ 
+    @Override
+    public ContentResolver getContentResolver() {
+        return mBase.getContentResolver();
+    }
+ 
+    @Override
+    public Looper getMainLooper() {
+        return mBase.getMainLooper();
+    }
+    
+    @Override
+    public Context getApplicationContext() {
+        return mBase.getApplicationContext();
+    }
+ 
+    @Override
+    public String getPackageName() {
+        return mBase.getPackageName();
+    }
+ 
+    @Override
+    public void startActivity(Intent intent) {
+        mBase.startActivity(intent);
+    }
+    
+    @Override
+    public void sendBroadcast(Intent intent) {
+        mBase.sendBroadcast(intent);
+    }
+ 
+    @Override
+    public Intent registerReceiver(
+        BroadcastReceiver receiver, IntentFilter filter) {
+        return mBase.registerReceiver(receiver, filter);
+    }
+ 
+    @Override
+    public void unregisterReceiver(BroadcastReceiver receiver) {
+        mBase.unregisterReceiver(receiver);
+    }
+ 
+    @Override
+    public ComponentName startService(Intent service) {
+        return mBase.startService(service);
+    }
+ 
+    @Override
+    public boolean stopService(Intent name) {
+        return mBase.stopService(name);
+    }
+ 
+    @Override
+    public boolean bindService(Intent service, ServiceConnection conn,
+            int flags) {
+        return mBase.bindService(service, conn, flags);
+    }
+ 
+    @Override
+    public void unbindService(ServiceConnection conn) {
+        mBase.unbindService(conn);
+    }
+ 
+    @Override
+    public Object getSystemService(String name) {
+        return mBase.getSystemService(name);
+    }
+ 
+    ......
+}
+
+其实所有ContextWrapper中方法的实现都非常统一，就是调用了mBase对象中对应当前方法名的方法。
+
+那么这个mBase对象又是什么呢？我们来看第69行的attachBaseContext()方法，这个方法中传入了一个base参数，并把这个参数赋值给了mBase对象。
+而attachBaseContext()方法其实是由系统来调用的，它会把ContextImpl对象作为参数传递到attachBaseContext()方法当中，从而赋值给mBase对象，
+之后ContextWrapper中的所有方法其实都是通过这种委托的机制交由ContextImpl去具体实现的，所以说ContextImpl是上下文功能的实现类是非常准确的。
+
+综上所述:
+
+第一个误区是不要在application的构造方法里使用以上方法，否则会报空指针异常，是因为构造方法的执行时间在attachBaseContext方法前，这个时候mBase对象还是空的
+如果追求终极速度，可以在attachBaseContext方法中做这些事情
+
+第二个误区是不要在application中写如下单例
+
+public class MyApplication extends Application {
+	
+	private static MyApplication app;
+	
+	public static MyApplication getInstance() {
+		if (app == null) {
+			app = new MyApplication();
+		}
+		return app;
+	}
+	
+}
+
+这种写法是大错特错！因为我们知道Application是属于系统组件，系统组件的实例是要由系统来去创建的，如果这里我们自己去new一个MyApplication的实例，
+它就只是一个普通的Java对象而已，而不具备任何Context的能力。
+
+那么如果真的想要提供一个获取MyApplication实例的方法，比较标准的写法又是什么样的呢？其实这里我们只需谨记一点，Application全局只有一个，它本身就已经是单例了，
+无需再用单例模式去为它做多重实例保护了，代码如下所示：
+
+public class MyApplication extends Application {
+	
+	private static MyApplication app;
+	
+	public static MyApplication getInstance() {
+		return app;
+	}
+	
+	@Override
+	public void onCreate() {
+		super.onCreate();
+		app = this;
+	}
+	
+}
+
+
+
+
