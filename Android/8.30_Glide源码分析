@@ -1,0 +1,12 @@
+Glide源码解析
+
+1.with()方法:
+
+它是一组静态返回RequestManager的方法，有多个重载用法，传入的参数就是Context,activity,fragment其中之一。
+方法体都是先获取一个RequestManagerRetriever静态实例(单例)，再通过这个实例的get方法获取RequestManager实例
+
+如果在with中传入的是Application对象，那么就会调用参数为Context的重载方法,这样的话Glide就和application的生命周期同步了，即随着整个应用同生死
+
+当with中传入的是fragment或activity的话，最终的流程都是一样的，那就是会向当前的Activity当中添加一个隐藏的Fragment。
+因为Glide需要知道加载的生命周期。从而做出相应的动作，比如activity销毁时停止加载图片，当然这里有个细节那就是如果当前不在主线程的话，那么无论传进来的
+是fragment还是activity都会被当成application处理

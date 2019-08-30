@@ -1,0 +1,35 @@
+Q：IPC原理
+
+A：从进程角度看IPC进制
+每个Android的进程，只能运行在自己进程所拥有的虚拟地址空间。例如对于一个4G的虚拟空间，其中3G是用户空间，
+1G是内核空间，当然内核空间可以通过配置改变，对于用户空间在不同进程间是不可以共享的，而内核空间却可以做到这点
+Client进程向Server进程通讯，恰恰就是利用了进程间可共享的内核内存空间来完成底层通信工作的。
+Client端与Server端进程往往采用ioctl等方法跟内核空间的驱动进行交互。
+
+Q: Binder原理
+
+A: Binder通信采用C/S架构,从组件视角来说，包含Client,Server,ServiceManager还有binder驱动。
+其中ServiceManager用于管理系统中的各种服务，无论是注册服务还是获取服务的过程，都需要ServiceManager,这里的ServiceManager
+指的是native层的(C++),不是framework的。ServiceManager是整个binder机制的大管家，是Android进程间通信机制Binder的守护进程
+当ServiceManager启动之后，Client端和Server端通信时都需要先获取ServiceManager接口，才能开始通信。
+Client/Server/ServiceManage之间的相互通信都是基于Binder机制。同样也是C/S架构。通信分为三步
+
+1.注册服务：
+Server进程要先注册Service到ServiceManager.该过程Server是客户端，ServiceManager是服务端
+
+2.获取服务：
+Client进程使用某个Service前，需要向ServiceManager获取该服务，这个过程Client是客户端，ServiceManager是服务端
+
+3.使用服务：
+Client根据得到的Service信息建立与service所在Server进程通信的通道，然后就可以直接交互了，这个过程Client是客户端，Server是服务端
+
+要知道的是Server,Client,ServiceManager之间不是直接交互的，而是都通过与binder驱动进行交互的。从而实现IPC通信
+其中binder驱动位于内核空间。Client,Server,ServiceManager位于用户空间。Binder驱动与ServiceManager可以看作是Android平台的基础架构，而Client与Server
+是android应用层,所以我们只需自定义Client与Server然后借助这个基本架构就可以直接进行IPC通信
+
+Q：C/S架构:
+
+A: BpBinder(客户端)和BBinder(服务端)都是Android中Binder通信相关的代表。它们都是IBinder类中派生出来的
+
+client端：BpBinder.transact()来发送事务请求；
+server端：BBinder.onTransact()会接收到相应事务。
