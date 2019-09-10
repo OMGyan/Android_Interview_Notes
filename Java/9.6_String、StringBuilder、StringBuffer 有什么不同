@@ -1,0 +1,10 @@
+Q:String、StringBuilder、StringBuffer 有什么不同
+
+A:String是用final修饰的类，由于它的不可变性，类似拼接，裁剪字符串等，都会产生新的对象。
+这个时候我们就可以使用StringBuffer,StringBuilder通过append等方法拼接。StringBuffer是线程安全的，
+由于线程安全，所以它的效率便会下降，而StringBuilder正好相反，它是线程不安全的，效率更好
+
+追问:说说String 为什么会产生新的对象？
+
+例如:String a = "daa" String b = a + "dasd" ,如果你这样写，首先会在常量池中产生一个对象指向a，而
+创建b时也会重新在常量池中生成b的对象；这样如果多次创建容易触发GC，所以不建议使用String类去拼接字符串
