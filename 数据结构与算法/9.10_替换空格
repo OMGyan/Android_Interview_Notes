@@ -1,0 +1,43 @@
+Q:将一个字符串中的空格替换成 "%20"。
+
+Input:
+"A B"
+
+Output:
+"A%20B"
+
+A: 思路就是从原字符串从尾到头遍历，每出现一次空格，就在尾部加两个空格，这样做的目的是为了让新字符串的长度，与替换过后的长度
+保持一致。操作完之后呢！我们令原字符串末尾元素为p1,新字符串末尾元素为p2，以p1为起点逆序遍历，同时新字符串也从p2开始逆序往前更新元素
+当原字符串遍历遇到空格时，新字符串便依次填充0,2，%，否则填充遍历到的元素。这里的前提是原字符串的遍历的最后一个下标必须不小于零，同时保持小于
+新字符串遍历的下标
+
+public String replaceSpace(StringBuffer str) {
+
+    //先取原字符串末尾元素下标
+    int p1 = str.length()-1;
+    //遍历原字符串
+    for(int i = 0; i <= p1; i++){
+        //出现空格便在末尾加双空格
+        if(str.charAt(i) == ''){
+            str.append("  ");
+        }
+    }
+    
+    //取新字符串末尾元素下标
+    int p2 = str.length()-1;
+
+    //开始替换新字符串
+    while(p1>=0 && p2>p1){
+       char c = str.charAt(p1--);
+       if(c == ''){
+          str.setCharAt(p2--,'0');
+          str.setCharAt(p2--,'2');
+          str.setCharAt(p2--,'%');
+       }else{
+          str.setCharAt(p2--,c);
+       }
+    }
+
+    return str.toString();	
+
+}

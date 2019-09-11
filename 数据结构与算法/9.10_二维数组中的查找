@@ -1,0 +1,40 @@
+Q:给定一个二维数组，其每一行从左到右递增排序，从上到下也是递增排序。给定一个数，判断这个数是否在该二维数组中。
+
+Consider the following matrix:
+[
+  [1,   4,  7, 11, 15],
+  [2,   5,  8, 12, 19],
+  [3,   6,  9, 16, 22],
+  [10, 13, 14, 17, 24],
+  [18, 21, 23, 26, 30]
+]
+
+Given target = 5, return true.
+Given target = 20, return false.
+
+
+
+要求时间复杂度 O(M + N)，空间复杂度 O(1)。其中 M 为行数，N 为 列数。
+
+A:思路就是从右上角开始比较，目标数小于它就往左，大于它就往下，总体而言就是比较左下角的区域
+
+private boolean isExistTargetInMatrix(int target,int[][] matrix){
+    //行数
+    int x = matrix.length;
+    //列数
+    int y = matrix[0].length;
+    //取右上角数的位置
+    int x1 = 0,y1 = y - 1;
+
+    while(x1<=x-1 && y1>=0){
+       if(matrix[x1][y1]==target){
+           return true;
+       }else if(target>matrix[x1][y1]){
+           x1++;
+       }else{
+           y1--;
+       }
+    }
+    
+    return false;
+}
