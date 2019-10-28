@@ -1,0 +1,65 @@
+Q:从尾到头反过来打印出链表每个节点的值。
+
+A:首先如果该链表是双向链表结构的话，我们很简单就可以解决这个问题。
+
+public void reverseDisPlay(){
+
+    Node ct = tail;
+    int temp = size;
+
+    if(temp!=0){
+        if(temp == 1){
+            System.out.println("["+ct.data+"]");
+        }else{
+            while(temp!=0){
+                if(ct == tail){
+                     System.out.print("["+ct.data+",");
+                }else if(ct == head){
+                     System.out.print(ct.data+"]");
+                }else{
+                     System.out.print(ct.data+",");
+                }
+                ct = ct.prel;
+                temp--;
+            }
+            System.out.println("");
+        }
+    }else{
+        System.out.println("[]")
+    }
+
+}
+
+如果是其他类型链表结构由于没有对上个节点的指针，所以我们没法自己打印。接下来我们采用两种方案来解决链表的通用逆序打印
+
+一，采用栈；
+由于栈结构具有后进先出的特点，正好符合问题要求
+
+public ArrayList<Integer> reverseDisPlay(Node head){
+     Stack<Integer> stack = new Stack<>();
+     while(head!=null){
+          stack.add(head.data);
+          head = head.next;
+     }
+     ArrayList<Integer> ret = new ArrayList<>();
+     while (!stack.isEmpty()){
+         ret.add(stack.pop());
+     }
+     return ret;
+}
+
+二，采用递归算法；
+
+要逆序打印链表 1->2->3（3,2,1)，可以先逆序打印链表 2->3(3,2)，最后再打印第一个节点 1。而链表 2->3 可以看成一个新的链表，
+要逆序打印该链表可以继续使用求解函数，也就是在求解函数中调用自己，这就是递归函数。
+
+public ArrayList<Integer> printListFromTailToHead(ListNode listNode) {
+    ArrayList<Integer> ret = new ArrayList<>();
+    if (listNode != null) {
+        ret.addAll(printListFromTailToHead(listNode.next));
+        ret.add(listNode.val);
+    }
+    return ret;
+}
+
+

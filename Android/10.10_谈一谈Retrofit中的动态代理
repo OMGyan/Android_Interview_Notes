@@ -1,0 +1,316 @@
+首先我们在用Retrofit时都会这么写
+GitHub github = retrofit.create(GitHub.class);
+但是这里会有个疑问就是，它到底是怎么通过这个interface来创建出一个对象呢？
+如果你不了解Java中动态代理这个机制的话，可能会猜是不是采用匿名内部类啊！其实不是，
+我们来看看create方法的内部实现，这里只分析关键地方
+
+public <T> T create(final Class<T> service) {
+     
+    //它这里是直接通过Proxy.newProxyInstance方法来创建的。它就是Java当中内置的动态代理机制
+     /**
+     * 第一个参数为classloader，这里其实大概能猜到它会产生新类，就是说不会是上文示例的接口了。
+     * 第二个参数就是要实现的interface，这里是用class的数组装的，这里其实只能接收接口，用其他的就报错了，待会儿可以试试
+     * 第三个参数是一个接口类InvocationHandler，这个是核心
+     */ 
+    return (T) Proxy.newProxyInstance(service.getClassLoader(), new Class<?>[] { service },
+        new InvocationHandler() {
+        
+          @Override public @Nullable Object invoke(Object proxy, Method method,
+              @Nullable Object[] args) throws Throwable {
+            // 如果这个方法是从object就继承下来的，例如toString，equals方法，这里就直接反射调用了。
+            if (method.getDeclaringClass() == Object.class) {
+              return method.invoke(this, args);
+            }
+            //在Java8之后呢，接口里面可以定义一个默认方法。例如  default void hello(){ ... },如果是这样也直接调用了
+            if (platform.isDefaultMethod(method)) {
+              return platform.invokeDefaultMethod(method, service, proxy, args);
+            }
+            //最终来到这里就会返回一个封装了请求参数的接口
+            return loadServiceMethod(method).invoke(args != null ? args : emptyArgs);
+          }
+        });
+  }
+
+ 分析到这里的话，我们对于这个对象怎么出来的大概有了如下答案，它就是使用Java的动态代理，把我们接口里声明的所有方法，转给了retrofit
+ 中InvocationHandler里的invoke方法，再通过loadServiceMethod方法去处理。接下来我们继续分析这个方法。源码如下：
+ ServiceMethod<?> loadServiceMethod(Method method) {
+    ServiceMethod<?> result = serviceMethodCache.get(method);
+    if (result != null) return result;
+
+    synchronized (serviceMethodCache) {
+      result = serviceMethodCache.get(method);
+      if (result == null) {
+        result = ServiceMethod.parseAnnotations(this, method);
+        serviceMethodCache.put(method, result);
+      }
+    }
+    return result;
+  }
+  我们再看看ServiceMethod
+
+  abstract class ServiceMethod<T> {
+  static <T> ServiceMethod<T> parseAnnotations(Retrofit retrofit, Method method) {
+    RequestFactory requestFactory = RequestFactory.parseAnnotations(retrofit, method);
+
+    Type returnType = method.getGenericReturnType();
+    if (Utils.hasUnresolvableType(returnType)) {
+      throw methodError(method,
+          "Method return type must not include a type variable or wildcard: %s", returnType);
+    }
+    if (returnType == void.class) {
+      throw methodError(method, "Service methods cannot return void.");
+    }
+
+    return HttpServiceMethod.parseAnnotations(retrofit, method, requestFactory);
+  }
+
+  abstract @Nullable T invoke(Object[] args);
+
+  我们来看看invoke方法的具体实现
+  @Override final @Nullable ReturnT invoke(Object[] args) {
+    Call<ResponseT> call = new OkHttpCall<>(requestFactory, args, callFactory, responseConverter);
+    return adapt(call, args);
+  }
+  而这个方法的所处在的类HttpServiceMethod是继续自ServiceMethod，我们先记住这个细节
+  我们已经知道这个对象是怎么创建出来的，那么我们可以打印一下。不然用着太害怕了
+   System.out.println(github.getClass());
+   结果是这样：class com.sun.proxy.$Proxy0
+   这就证明它确实不是叫GitHub的一个类了
+   好的，我们来看newProxyInstance方法：
+   public static Object newProxyInstance(ClassLoader loader,
+                                          Class<?>[] interfaces,
+                                          InvocationHandler h)
+        throws IllegalArgumentException
+    {
+        //重点关注这里
+        Class<?> cl = getProxyClass0(loader, intfs);
+
+        /*
+         * Invoke its constructor with the designated invocation handler.
+         */
+        try {
+            if (sm != null) {
+                checkNewProxyPermission(Reflection.getCallerClass(), cl);
+            }
+
+            final Constructor<?> cons = cl.getConstructor(constructorParams);
+            final InvocationHandler ih = h;
+            if (!Modifier.isPublic(cl.getModifiers())) {
+                AccessController.doPrivileged(new PrivilegedAction<Void>() {
+                    public Void run() {
+                        cons.setAccessible(true);
+                        return null;
+                    }
+                });
+            }
+            return cons.newInstance(new Object[]{h});
+        } catch (IllegalAccessException|InstantiationException e) {
+            throw new InternalError(e.toString(), e);
+        } catch (InvocationTargetException e) {
+            Throwable t = e.getCause();
+            if (t instanceof RuntimeException) {
+                throw (RuntimeException) t;
+            } else {
+                throw new InternalError(t.toString(), t);
+            }
+        } catch (NoSuchMethodException e) {
+            throw new InternalError(e.toString(), e);
+        }
+    }
+ 
+}
+
+看看getProxyClass0(loader, intfs)的实现：
+ /**
+     * Generate a proxy class.  Must call the checkProxyAccess method
+     * to perform permission checks before calling this.
+     */
+    private static Class<?> getProxyClass0(ClassLoader loader,
+                                           Class<?>... interfaces) {
+        if (interfaces.length > 65535) {
+            throw new IllegalArgumentException("interface limit exceeded");
+        }
+
+        // If the proxy class defined by the given loader implementing
+        // the given interfaces exists, this will simply return the cached copy;
+        // otherwise, it will create the proxy class via the ProxyClassFactory
+        return proxyClassCache.get(loader, interfaces);
+    }
+
+看看proxyClassCache
+private static final WeakCache<ClassLoader, Class<?>[], Class<?>>
+        proxyClassCache = new WeakCache<>(new KeyFactory(), new ProxyClassFactory());
+
+它肯定是从这个容器里面取，所以我们去看看get方法
+
+  public V get(K key, P parameter) {
+        Objects.requireNonNull(parameter);
+
+        expungeStaleEntries();
+
+        Object cacheKey = CacheKey.valueOf(key, refQueue);
+
+        // lazily install the 2nd level valuesMap for the particular cacheKey
+        ConcurrentMap<Object, Supplier<V>> valuesMap = map.get(cacheKey);
+        if (valuesMap == null) {
+            ConcurrentMap<Object, Supplier<V>> oldValuesMap
+                = map.putIfAbsent(cacheKey,
+                                  valuesMap = new ConcurrentHashMap<>());
+            if (oldValuesMap != null) {
+                valuesMap = oldValuesMap;
+            }
+        }
+
+        // create subKey and retrieve the possible Supplier<V> stored by that
+        // subKey from valuesMap
+        Object subKey = Objects.requireNonNull(subKeyFactory.apply(key, parameter));
+        Supplier<V> supplier = valuesMap.get(subKey);
+        Factory factory = null;
+
+        while (true) {
+            if (supplier != null) {
+                // supplier might be a Factory or a CacheValue<V> instance
+                V value = supplier.get();
+                if (value != null) {
+                    return value;
+                }
+            }
+            // else no supplier in cache
+            // or a supplier that returned null (could be a cleared CacheValue
+            // or a Factory that wasn't successful in installing the CacheValue)
+
+            // lazily construct a Factory
+            //看看这个Factory
+            if (factory == null) {
+                factory = new Factory(key, parameter, subKey, valuesMap);
+            }
+
+            if (supplier == null) {
+                supplier = valuesMap.putIfAbsent(subKey, factory);
+                if (supplier == null) {
+                    // successfully installed Factory
+                    supplier = factory;
+                }
+                // else retry with winning supplier
+            } else {
+                if (valuesMap.replace(subKey, supplier, factory)) {
+                    // successfully replaced
+                    // cleared CacheEntry / unsuccessful Factory
+                    // with our Factory
+                    supplier = factory;
+                } else {
+                    // retry with current supplier
+                    supplier = valuesMap.get(subKey);
+                }
+            }
+        }
+    }
+
+通过查看这个Factory,我们发现这个WeakCache的构造方法被这样用过：
+ private static final WeakCache<ClassLoader, Class<?>[], Class<?>>
+        proxyClassCache = new WeakCache<>(new KeyFactory(), new ProxyClassFactory());
+
+ 一看new ProxyClassFactory()这个可疑了：(最最核心的地方来了)
+
+    /**
+     * A factory function that generates, defines and returns the proxy class given
+     * the ClassLoader and array of interfaces.
+     */
+    private static final class ProxyClassFactory
+        implements BiFunction<ClassLoader, Class<?>[], Class<?>>
+    {
+        // prefix for all proxy class names
+        private static final String proxyClassNamePrefix = "$Proxy";
+
+        // next number to use for generation of unique proxy class names
+        private static final AtomicLong nextUniqueNumber = new AtomicLong();
+
+        @Override
+        public Class<?> apply(ClassLoader loader, Class<?>[] interfaces) {
+
+            Map<Class<?>, Boolean> interfaceSet = new IdentityHashMap<>(interfaces.length);
+            for (Class<?> intf : interfaces) {
+                /*
+                 * Verify that the class loader resolves the name of this
+                 * interface to the same Class object.
+                 */
+                Class<?> interfaceClass = null;
+                try {
+                    interfaceClass = Class.forName(intf.getName(), false, loader);
+                } catch (ClassNotFoundException e) {
+                }
+                if (interfaceClass != intf) {
+                    throw new IllegalArgumentException(
+                        intf + " is not visible from class loader");
+                }
+                /*
+                 * Verify that the Class object actually represents an
+                 * interface.
+                 */
+                if (!interfaceClass.isInterface()) {
+                    throw new IllegalArgumentException(
+                        interfaceClass.getName() + " is not an interface");
+                }
+                /*
+                 * Verify that this interface is not a duplicate.
+                 */
+                if (interfaceSet.put(interfaceClass, Boolean.TRUE) != null) {
+                    throw new IllegalArgumentException(
+                        "repeated interface: " + interfaceClass.getName());
+                }
+            }
+
+            String proxyPkg = null;     // package to define proxy class in
+            int accessFlags = Modifier.PUBLIC | Modifier.FINAL;
+
+        
+            for (Class<?> intf : interfaces) {
+                int flags = intf.getModifiers();
+                if (!Modifier.isPublic(flags)) {
+                    accessFlags = Modifier.FINAL;
+                    String name = intf.getName();
+                    int n = name.lastIndexOf('.');
+                    String pkg = ((n == -1) ? "" : name.substring(0, n + 1));
+                    if (proxyPkg == null) {
+                        proxyPkg = pkg;
+                    } else if (!pkg.equals(proxyPkg)) {
+                        throw new IllegalArgumentException(
+                            "non-public interfaces from different packages");
+                    }
+                }
+            }
+
+            if (proxyPkg == null) {
+                // if no non-public proxy interfaces, use com.sun.proxy package
+                proxyPkg = ReflectUtil.PROXY_PACKAGE + ".";
+            }
+
+            /*
+             * Choose a name for the proxy class to generate.
+             */
+            long num = nextUniqueNumber.getAndIncrement();
+            String proxyName = proxyPkg + proxyClassNamePrefix + num;
+
+            /*
+             * Generate the specified proxy class.//生成指定的代理类。
+             *  这就是生成类的字节码
+             */
+            byte[] proxyClassFile = ProxyGenerator.generateProxyClass(
+                proxyName, interfaces, accessFlags);
+            try {
+                return defineClass0(loader, proxyName,
+                                    proxyClassFile, 0, proxyClassFile.length);
+            } catch (ClassFormatError e) 
+                throw new IllegalArgumentException(e.toString());
+            }
+        }
+    }
+    总结:
+    
+    虚拟机内部生成了代理类的class二进制流，并且加载到虚拟机中形成代理类的class对象，再反射得到代理类对象,而该代理类即实现了传入的接口，
+    并且持有了InvocationHandler的引用。当调用接口的方法时就会去调用代理对象的对应方法，它会调用该InvocationHandler引用对象的invoke方法，
+    并传入调用方法的method对象。InvocationHandler引用的对象的invoke方法会通过该Method对象，得到方法的注解以及参数，
+    得到Http请求的链接、请求方法、请求路径、参数等请求信息，构建一个OkHttp的请求并执行。
+
+
+    
