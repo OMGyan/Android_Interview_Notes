@@ -1,0 +1,17 @@
+题目描述:求斐波那契数列的第 n 项，n <= 39。
+
+思路:递归算法
+
+简单解法:
+/**
+ * 斐波那契数列规律:
+ * F(1)=1，F(2)=1, F(n)=F(n-1)+F(n-2)（n>=3，n∈N*）
+ * @param n
+ * @return
+ */
+public int getFibonacciSum(int n){
+   if(n>=3){
+       return getFibonacciSum(--n)+getFibonacciSum(--n);
+   }
+       return 1;
+}
