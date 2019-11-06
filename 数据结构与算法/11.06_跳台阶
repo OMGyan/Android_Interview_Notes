@@ -1,0 +1,20 @@
+题目描述:一只青蛙一次可以跳上 1 级台阶，也可以跳上 2 级。求该青蛙跳上一个 n 级的台阶总共有多少种跳法。
+
+思路:当n=1时，一共只有一种跳法。当n = 2时，一共两种跳法，我们可推测出，当n级台阶时，我们可以先算一种，随后再算n-1子问题
+或者先算两种，随后再算n-2子问题。递推公式:f(n) = f(n-1) + f(n-2)
+
+解法:
+
+public int jumpStairs(int n){
+    if(n <= 2){
+        return n;
+    }
+    int pre1 = 1,pre2 = 2,result = 0;
+    for(int x = 2;x < n;x++){
+        result = pre1 + pre2;
+        pre1 = pre2;
+        pre2 = result;
+    }
+    return result;
+}
+
