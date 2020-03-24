@@ -1,0 +1,30 @@
+Q:把一个数组最开始的若干个元素搬到数组的末尾，我们称之为数组的旋转。输入一个非递减排序的数组的一个旋转，输出旋转数组的最小元素。
+
+例如数组{3,4,5,1,2}为{1,2,3,4,5}的一个旋转，该数组的最小值为1。给出的所有元素都大于0，若数组大小为0，请返回0
+
+A：我们可以用折半查找算法，将旋转数组拆成两半，一半为非递减数组，一半为旋转数组，这样就将问题的规模缩小一半。重要的就是如何分辨它们
+
+private int getMinNumsOfRotateArray(int[] array){
+     if(array.length == 0){
+         return 0;
+     }
+     int left = 0;
+     int right = array.length-1;
+     while(left < right){
+         int mid = (left+right)/2;
+         if(array[left] == array[right] && array[right] == array[mid]){
+             for(int i = left;i < right;i++){
+                 if(array[i] > array[i+1]){
+                     return array[i+1];
+                 }
+             }
+             return array[left];
+         }
+         if(array[mid] <= array[right]){
+             right = mid;
+         }else{
+             left = mid + 1;
+         }
+     }
+     return array[left];
+}
