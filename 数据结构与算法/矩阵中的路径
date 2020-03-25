@@ -1,0 +1,61 @@
+Q:请设计一个函数，用来判断在一个矩阵中是否存在一条包含某字符串所有字符的路径。路径可以从矩阵中的任意一个格子开始，
+每一步可以在矩阵中向左，向右，向上，向下移动一个格子。如果一条路径经过了矩阵中的某一个格子，则该路径不能再进入该格子。 
+例如 {'a','b','t','g',
+      'c','f','c','s',
+      'j','d','e','h'};
+矩阵中包含一条字符串"bfce"的路径，但是矩阵中不包含"abfb"路径，因为字符串的第二个字符b占据了矩阵中的第一行第二个格子之后，路径不能再次进入该格子。
+
+A：采用递归加回溯，每个字符都有上，下，左，右四个方向的可能，每走一个字符标记为true，当该方向不符时，及时清除，再试另一条路...
+
+ public boolean hasPath(char[] matrix, int rows, int cols, char[] str)
+    {
+        char[][] matrixChar = buildMatrix(matrix,rows,cols);
+        return isExistTargetCharPathInMatrix(matrixChar,str);
+    }
+    
+     private boolean isExistTargetCharPathInMatrix(char[][] matrixChar, char[] str) {
+        boolean[][] coverFlagArray = new boolean[matrixChar.length][matrixChar[0].length];
+        for (int i = 0; i < matrixChar.length; i++) {
+            for (int j = 0; j < matrixChar[0].length; j++) {
+                if(solve(matrixChar,str,i,j,coverFlagArray,0)){
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean solve(char[][] matrixChar, char[] str, int i, int j, boolean[][] coverFlagArray, int index) {
+        //临界断开
+        if(i<0||i>=matrixChar.length||j<0||j>=matrixChar[0].length||coverFlagArray[i][j]){
+            return false;
+        }
+        //字符不匹配断开
+        if(str[index]!=matrixChar[i][j]){
+            return false;
+        }
+        //字符全部匹配完
+        if(index==str.length-1){
+            return true;
+        }
+        //标记
+        coverFlagArray[i][j] = true;
+        boolean flag = solve(matrixChar,str,i+1,j,coverFlagArray,index+1)||
+                solve(matrixChar,str,i-1,j,coverFlagArray,index+1)||
+                solve(matrixChar,str,i,j+1,coverFlagArray,index+1)||
+                solve(matrixChar,str,i,j-1,coverFlagArray,index+1);
+        //标记清除        
+        coverFlagArray[i][j] = false;
+        return flag;
+    }
+
+    //构建矩阵
+    private char[][] buildMatrix(char[] pathChar, int i, int j) {
+        char[][] matrix = new char[i][j];
+        for (int r = 0,index = 0; r < i; r++) {
+            for (int c = 0; c < j; c++) {
+                matrix[r][c] = pathChar[index++];
+            }
+        }
+        return matrix;
+    }
