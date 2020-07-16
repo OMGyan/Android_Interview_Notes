@@ -6,7 +6,7 @@ A:使用递归,这里我不使用回溯算法，所以只需往右或者往下�
 
 
 public class Solution {
-    jin
+     
     int sum = 0;
     public int movingCount(int threshold, int rows, int cols){
         boolean[][] isVis  = new boolean[rows][cols];
@@ -24,7 +24,7 @@ public class Solution {
         return num;
     }
     
-    private void solve(int x,int y,int row,int col,boolean[][] isFlag,int k){
+     private void solve(int x,int y,int row,int col,boolean[][] isFlag,int k){
         if(x < 0||y < 0||x >= row||y >= col||(cul(x) + cul(y)) > k||isFlag[x][y]){
             return;
         }
