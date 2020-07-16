@@ -1,0 +1,37 @@
+Q:地上有一个 m 行和 n 列的方格。一个机器人从坐标 (0, 0) 的格子开始移动，每一次只能向左右上下四个方向移动一格，但是不能进入行坐标和列坐标的数位之和大于 k 的格子。
+例如，当 k 为 18 时，机器人能够进入方格 (35,37)，因为 3+5+3+7=18。但是，它不能进入方格 (35,38)，因为 3+5+3+8=19。请问该机器人能够达到多少个格子？
+
+
+A:使用递归,这里我不使用回溯算法，所以只需往右或者往下，详细代码如下：
+
+
+public class Solution {
+    jin
+    int sum = 0;
+    public int movingCount(int threshold, int rows, int cols){
+        boolean[][] isVis  = new boolean[rows][cols];
+        solve(0,0,rows,cols,isVis,threshold);
+        return sum;
+    }
+    
+    private int cul(int data){
+        int num = 0;
+        String str = String.valueOf(data);
+        for(char c : str.toCharArray()){
+             int a = (int)c - (int)('0');
+             num += a;
+        }
+        return num;
+    }
+    
+    private void solve(int x,int y,int row,int col,boolean[][] isFlag,int k){
+        if(x < 0||y < 0||x >= row||y >= col||(cul(x) + cul(y)) > k||isFlag[x][y]){
+            return;
+        }
+        isFlag[x][y] = true;
+        sum++;
+        solve(x + 1,y,row,col,isFlag,k);
+        solve(x,y + 1,row,col,isFlag,k);
+    }
+    
+}
